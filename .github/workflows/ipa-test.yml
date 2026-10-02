@@ -1,0 +1,120 @@
+name: ETS2 TruckersMP test IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truckersmp-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 360
+    env:
+      MADEIRA_BUILD_JOBS: '2'
+      TMPDIR: ${{ github.workspace }}/TMP/
+      CLANG_MODULE_CACHE_PATH: ${{ github.workspace }}/TMP/clang-modules
+      CCACHE_DIR: ${{ github.workspace }}/TMP/ccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Prepare workspace and Xcode
+        id: xcode
+        shell: bash
+        run: |
+          mkdir -p TMP
+          selected="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)"
+          if [ -n "$selected" ]; then sudo xcode-select -s "$selected/Contents/Developer"; fi
+          xcodebuild -version
+          echo "version=$(xcodebuild -version | tr '\n' '-' | tr ' ' '_')" >> "$GITHUB_OUTPUT"
+          major="$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)"
+          [ "$major" -ge 26 ] || { echo 'Xcode 26 or newer is required'; exit 1; }
+          if ! xcrun -sdk macosx metal --version; then xcodebuild -downloadComponent MetalToolchain; fi
+      - name: Install build tools
+        run: brew install cmake ninja meson bison flex pkg-config ccache llvm
+      - name: Test startup hook
+        run: |
+          clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-startup.c -o TMP/startup-test
+          TMP/startup-test
+      - name: Record native source pins
+        id: pins
+        shell: bash
+        run: |
+          revision="$(git ls-tree HEAD FEX wine dxmt madeira-dock | shasum -a 256 | cut -d' ' -f1)"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+      - name: Cache native runtime
+        uses: actions/cache@v4
+        id: native
+        with:
+          key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-${{ steps.pins.outputs.revision }}-${{ hashFiles('build/**/*.sh', 'build/truckersmp/**', 'build/**/*.c', 'build/**/*.h') }}
+          path: |
+            FEX/build-ios
+            toolchains/gnutls-ios
+            toolchains/ffmpeg-ios
+            toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            toolchains/llvm-ios-build/lib
+            build/freetype-ios/build
+            app/Madeira/lib*.a
+            app/Madeira/arm64ec-windows/ntdll.dll
+            app/Madeira/arm64ec-windows/kernelbase.dll
+            app/Madeira/arm64ec-windows/dockhost.exe
+            app/Madeira/arm64ec-windows/dock-notices.txt
+      - name: Build native runtime
+        if: steps.native.outputs.cache-hit != 'true'
+        run: bash build/truckersmp/prepare-native.sh 2>&1 | tee TMP/native-build.log
+      - name: Verify and stage supplied ETS2 files
+        run: python3 build/truckersmp/unpack-payload.py
+      - name: Build iPhone app
+        shell: bash
+        run: |
+          mkdir -p app/Madeira/x86_64-vcruntime
+          bash build/stage-licenses.sh
+          xcodebuild -project app/Madeira.xcodeproj -scheme Madeira \
+            -configuration Debug -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/TMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM= CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            build 2>&1 | tee TMP/xcode-build.log
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          mkdir -p TMP/package/Payload
+          ditto TMP/DerivedData/Build/Products/Debug-iphoneos/Madeira.app TMP/package/Payload/Madeira.app
+          test -f TMP/package/Payload/Madeira.app/TruckersMP/core_ets2mp.dll
+          test -f TMP/package/Payload/Madeira.app/arm64ec-windows/dockhost.exe
+          test ! -e TMP/package/Payload/Madeira.app/TruckersMP/core_atsmp.dll
+          test ! -d TMP/package/Payload/Madeira.app/TruckersMP/data/ats
+          ditto -c -k --keepParent TMP/package/Payload TMP/TruckersMP-ETS2-test-unsigned.ipa
+          shasum -a 256 TMP/TruckersMP-ETS2-test-unsigned.ipa > TMP/TruckersMP-ETS2-test-unsigned.ipa.sha256
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TruckersMP-ETS2-test-unsigned
+          path: |
+            TMP/TruckersMP-ETS2-test-unsigned.ipa
+            TMP/TruckersMP-ETS2-test-unsigned.ipa.sha256
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            TMP/*.log
+            build/**/*.err
+            build/**/err-*.txt
+            FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
+          retention-days: 7

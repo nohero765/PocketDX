@@ -1192,6 +1192,7 @@ struct ContentView: View {
     @ObservedObject private var library = LibraryModel.shared
     /// "Use New Interface" (actionButtons) applies at the next start.
     @State private var showFrontendRestart = false
+    @State private var preparingTruckersMP = false
 
     enum JITStatus {
         case unknown
@@ -1214,8 +1215,8 @@ struct ContentView: View {
                 if library.enabled && library.current != nil {
                     sessionBody
                 } else if library.enabled {
-                    LibraryView(play: launchLibraryEntry, enableJIT: enableJITViaStikDebug,
-                                startDock: { startDock($0, compactPool: $1) })
+                    TruckersMPTestView(launch: startTruckersMP, enableJIT: enableJITViaStikDebug,
+                                       preparingPayload: preparingTruckersMP)
                 } else if vSizeClass == .compact {
                     landscapeBody
                 } else {
@@ -1226,7 +1227,7 @@ struct ContentView: View {
             // this if/else (two SwiftUI identities) — HARMLESS since
             // 2026-07-05: MetalHostView is a process-lifetime singleton;
             // a fresh placeholder only re-parents the same CAMetalLayer.
-            .navigationTitle("Madeira")
+            .navigationTitle("TruckersMP Test")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.regularMaterial, for: .navigationBar)
             // The library keeps a material bar only before iOS 26. From iOS 26 the
@@ -2915,6 +2916,27 @@ struct ContentView: View {
     /// show in the library, and the session gets the full-screen game view.
     /// `profile` is a Steam game's library entry (its Game details page): the
     /// session then takes that entry's display, performance and on-screen settings.
+    private func startTruckersMP() {
+        guard !preparingTruckersMP, jit_check_debugged(), wine_process_is_running() == 0,
+              wineserver_is_running() == 0, library.current == nil else { return }
+        guard let game = MadeiraDock.games(drive: MadeiraDock.drive).first(where: {
+            $0.id == TruckersMPTest.appID && $0.installed
+        }) else { library.error = "Install ETS2 through Steam first."; return }
+        preparingTruckersMP = true
+        library.error = nil
+        Task { @MainActor in
+            defer { preparingTruckersMP = false }
+            do {
+                try await TruckersMPPayload.shared.prepare(drive: MadeiraDock.drive)
+                TruckersMPTest.configure()
+                startDock(game, compactPool: false)
+            } catch {
+                TruckersMPTest.clear()
+                library.error = error.localizedDescription
+            }
+        }
+    }
+
     private func startDock(_ game: DockGame, compactPool: Bool, profile: LibraryEntry? = nil) {
         let inLibrary = library.enabled
         guard jit_check_debugged() else {
@@ -2933,6 +2955,7 @@ struct ContentView: View {
             return
         }
         func fail(_ error: Error) {
+            TruckersMPTest.clear()
             MadeiraDock.cleanup()
             SteamOwnedLibrary.shared.dockEnded()
             MadeiraDockModel.shared.status = error.localizedDescription
@@ -3562,7 +3585,7 @@ struct TouchControlsOverlay: View {
                     if (m.visible || m.editing) && !library.blocksGameplayTouch {
                         controls(geo.size, session: session)
                     }
-                    if session && !m.editing { LibraryHUD() } else { topBar }
+                    if session && !m.editing { TruckersMPTestHUD() } else { topBar }
                     if m.editing, let i = m.index(of: m.selected) {
                         MappingPanel(control: m.controls[i], screen: geo.size)
                     }
