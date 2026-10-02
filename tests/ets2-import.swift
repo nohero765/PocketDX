@@ -48,16 +48,16 @@ import Foundation
         precondition((try? Data(contentsOf: importedRecord)) == manifest)
         let oldEXE = try Data(contentsOf: installed.appendingPathComponent("bin/win_x64/eurotrucks2.exe"))
         precondition(oldEXE[68] == 0x64)
+        exe[68] = 0x64; exe[69] = 0x86
+        try exe.write(to: executable)
         let steamDLL = game.appendingPathComponent("bin/win_x64/steam_api64.dll")
         try fm.removeItem(at: steamDLL)
         do {
             try await ETS2Import.shared.importFolder(source, drive: drive)
             fatalError("accepted missing Steam API library")
-        } catch is ETS2Import.Failure {}
+        } catch let failure as ETS2Import.Failure { precondition(failure.localizedDescription.contains("steam_api64.dll")) }
         precondition(fm.fileExists(atPath: installed.appendingPathComponent("bin/win_x64/steam_api64.dll").path))
         try Data("game library".utf8).write(to: steamDLL)
-        exe[68] = 0x64; exe[69] = 0x86
-        try exe.write(to: executable)
         try fm.createSymbolicLink(at: game.appendingPathComponent("linked-file"), withDestinationURL: recordURL)
         do {
             try await ETS2Import.shared.importFolder(source, drive: drive)
