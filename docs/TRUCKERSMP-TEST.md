@@ -24,6 +24,13 @@ retain their ordinary startup. `MADEIRA_TARGET_ARGS` adds the DX11 arguments to
 only the selected executable. This test app always requests Metal HUD through
 the app's Info.plist, user defaults and startup environment.
 
+The process hook preserves the opted loader settings in the selected game's
+environment even when Steam supplies an explicit environment block. It keeps
+unrelated Steam entries and fails process creation if mandatory DLL settings
+cannot be supplied. The separate environment allocation is freed after Wine
+has copied the child's startup information; other executables keep their
+ordinary environment.
+
 ## Payload
 
 The sibling `truckersmp-cli` folder is the supplied input. Run

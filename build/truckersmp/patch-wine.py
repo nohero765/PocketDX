@@ -49,4 +49,25 @@ if marker not in text:
         '    }\n\n' + anchor, 1)
     source.write_text(text)
 shutil.copyfile(Path(__file__).with_name('target-args.h'), source.with_name('madeira-target-args.h'))
+text = source.read_text()
+marker = '#include "madeira-child-env.h"'
+if marker not in text:
+    include = '#include "madeira-target-args.h"'
+    if text.count(include) != 1:
+        raise SystemExit('Pinned Wine target-argument include changed; inspect before patching.')
+    text = text.replace(include, include + '\n' + marker, 1)
+    start = text.index('BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW(')
+    opening = text.index('{', start) + 1
+    text = text[:opening] + '\n    WCHAR *madeira_environment = NULL;' + text[opening:]
+    anchor = '    if (flags & (DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS))'
+    if text.count(anchor) != 1:
+        raise SystemExit('Pinned Wine child-parameter anchor changed; inspect before patching.')
+    text = text.replace(anchor,
+        '    if ((status = madeira_target_environment(app_name, params, &madeira_environment))) goto done;\n\n' + anchor, 1)
+    anchor = '    RtlDestroyProcessParameters( params );'
+    if text.count(anchor) != 1:
+        raise SystemExit('Pinned Wine process cleanup anchor changed; inspect before patching.')
+    text = text.replace(anchor, anchor + '\n    HeapFree(GetProcessHeap(), 0, madeira_environment);', 1)
+    source.write_text(text)
+shutil.copyfile(Path(__file__).with_name('child-env.h'), source.with_name('madeira-child-env.h'))
 print('Wine startup DLL hook prepared')

@@ -5,11 +5,13 @@ static NTSTATUS madeira_target_arguments(const WCHAR *image, WCHAR **command)
 {
     WCHAR target[MAX_PATH], extra[1024];
     const WCHAR *basename = wcsrchr(image, '\\');
+    const WCHAR *slash = wcsrchr(image, '/');
     WCHAR *result;
     SIZE_T length, original_length;
     DWORD count = GetEnvironmentVariableW(L"MADEIRA_START_DLL_EXE", target, ARRAY_SIZE(target));
     if (!count) return STATUS_SUCCESS;
     if (count >= ARRAY_SIZE(target)) return STATUS_INVALID_PARAMETER;
+    if (slash && (!basename || slash > basename)) basename = slash;
     basename = basename ? basename + 1 : image;
     if (RtlCompareUnicodeStrings(basename, wcslen(basename), target, count, TRUE)) return STATUS_SUCCESS;
     count = GetEnvironmentVariableW(L"MADEIRA_TARGET_ARGS", extra, ARRAY_SIZE(extra));

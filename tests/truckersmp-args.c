@@ -44,6 +44,8 @@ int main(void) {
     assert(!madeira_target_arguments(L"C:\\Steam\\EUROTRUCKS2.EXE", &command));
     assert(!wcscmp(command, L"\"C:\\Steam\\Euro Truck Simulator 2\\bin\\win_x64\\eurotrucks2.exe\" -existing -rdevice dx11 -nointro -64bit"));
     free(command); command = original;
+    assert(!madeira_target_arguments(L"C:/Steam/eurotrucks2.exe", &command) && command != original);
+    free(command); command = original;
     WCHAR too_long[1026]; wmemset(too_long, L'x', 1025); too_long[1025] = 0;
     extra = too_long;
     assert(madeira_target_arguments(L"eurotrucks2.exe", &command) == STATUS_INVALID_PARAMETER && command == original);
