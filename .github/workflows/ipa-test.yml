@@ -17,6 +17,9 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
     env:
       MADEIRA_BUILD_JOBS: '2'
       TMPDIR: ${{ github.workspace }}/TMP/
@@ -60,7 +63,7 @@ jobs:
           echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
       - name: Cache native runtime
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         id: native
         with:
           key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-${{ steps.pins.outputs.revision }}-${{ hashFiles('build/**/*.sh', 'build/truckersmp/**', 'build/**/*.c', 'build/**/*.h') }}
@@ -79,6 +82,23 @@ jobs:
       - name: Build native runtime
         if: steps.native.outputs.cache-hit != 'true'
         run: bash build/truckersmp/prepare-native.sh 2>&1 | tee TMP/native-build.log
+      - name: Save native runtime
+        if: steps.native.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.native.outputs.cache-primary-key }}
+          path: |
+            FEX/build-ios
+            toolchains/gnutls-ios
+            toolchains/ffmpeg-ios
+            toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            toolchains/llvm-ios-build/lib
+            build/freetype-ios/build
+            app/Madeira/lib*.a
+            app/Madeira/arm64ec-windows/ntdll.dll
+            app/Madeira/arm64ec-windows/kernelbase.dll
+            app/Madeira/arm64ec-windows/dockhost.exe
+            app/Madeira/arm64ec-windows/dock-notices.txt
       - name: Verify and stage supplied ETS2 files
         run: python3 build/truckersmp/unpack-payload.py
       - name: Build iPhone app
@@ -121,6 +141,9 @@ jobs:
           path: |
             TMP/*.log
             build/**/*.err
+            build/**/*.log
             build/**/err-*.txt
+            wine/build-macos/config.log
+            wine/build-arm64ec/config.log
             FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
           retention-days: 7
