@@ -70,6 +70,10 @@ and builds only DXMT's required static archives. Its cache restores the prior
 partial LLVM build across this configuration change, so compiled objects can
 be reused without rebuilding the unused command-line tools. DXMT's three
 embedded AIR shader headers are generated before the converter is compiled.
+The native FEX build force-includes a project compatibility header to keep
+the fork's ARM64EC-only diagnostic counters inactive. It does not enable
+`FEX_IOS_HOST`, which requires Windows frontend helpers absent from this native
+link; the bundled ARM64EC guest keeps its existing instrumentation.
 
 Sideload with the required memory/JIT entitlements, enable debugger-backed JIT,
 sign in to Steam, prepare Steam, import ETS2, then select Launch TruckersMP.
