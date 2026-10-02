@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
         F10000000000000000000001 /* TruckersMPTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001; };
+        F10000000000000000000003 /* ETS2Import.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003; };
         F10000000000000000000002 /* TruckersMP in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002; };
 		A1000520 /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000520 /* MadeiraDock.swift */; };
 		A1000521 /* MadeiraDockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000521 /* MadeiraDockView.swift */; };
@@ -124,6 +125,7 @@
 
 /* Begin PBXFileReference section */
         F20000000000000000000001 /* TruckersMPTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TruckersMPTest.swift; sourceTree = "<group>"; };
+        F20000000000000000000003 /* ETS2Import.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ETS2Import.swift; sourceTree = "<group>"; };
         F20000000000000000000002 /* TruckersMP */ = {isa = PBXFileReference; lastKnownFileType = folder; path = TruckersMP; sourceTree = "<group>"; };
 		A2000520 /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock.swift"; sourceTree = "<group>"; };
 		A2000521 /* MadeiraDockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDockView.swift"; sourceTree = "<group>"; };
@@ -369,6 +371,7 @@
 				A2000202 /* FPSOverlay.swift */,
 				A2000400 /* Library.swift */,
                 F20000000000000000000001 /* TruckersMPTest.swift */,
+                F20000000000000000000003 /* ETS2Import.swift */,
                 F20000000000000000000002 /* TruckersMP */,
 				A2000401 /* GuestDisplay.swift */,
 				A2000004 /* JITAllocator.c */,
@@ -609,6 +612,7 @@
 				A1000202 /* FPSOverlay.swift in Sources */,
 				A1000400 /* Library.swift in Sources */,
                 F10000000000000000000001 /* TruckersMPTest.swift in Sources */,
+                F10000000000000000000003 /* ETS2Import.swift in Sources */,
 				A1000401 /* GuestDisplay.swift in Sources */,
 				A1000004 /* JITAllocator.c in Sources */,
 				A1000005 /* EntitlementChecker.swift in Sources */,

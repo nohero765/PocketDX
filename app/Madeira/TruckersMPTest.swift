@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import SwiftUI
 import CryptoKit
+import UniformTypeIdentifiers
 
 enum TruckersMPTest {
     static let appID = 227300
@@ -45,8 +46,7 @@ actor TruckersMPPayload {
             return
         }
         guard fm.fileExists(atPath: drive.path) else { throw Failure("Prepare Steam first.") }
-        let values = try drive.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        if let free = values.volumeAvailableCapacityForImportantUsage, free < 1_100_000_000 {
+        if let free = try ETS2Import.availableBytes(on: drive), free < 1_100_000_000 {
             throw Failure("Free at least 1.1 GB to prepare TruckersMP.")
         }
         let stage = drive.appendingPathComponent(".truckersmp-stage-" + UUID().uuidString)
@@ -85,9 +85,12 @@ struct TruckersMPTestView: View {
     let enableJIT: () -> Void
     let preparingPayload: Bool
     @ObservedObject private var dock = MadeiraDockModel.shared
-    @ObservedObject private var steam = SteamOwnedLibrary.shared
     @ObservedObject private var library = LibraryModel.shared
     @State private var showSignIn = false
+    @State private var showImport = false
+    @State private var importing = false
+    @State private var importProgress = 0.0
+    @State private var importError: String?
     @State private var jitReady = false
 
     private var installed: Bool { dock.games.contains { $0.id == TruckersMPTest.appID && $0.installed } }
@@ -103,19 +106,14 @@ struct TruckersMPTestView: View {
                     Button("Prepare Steam") { dock.prepareClient() }.disabled(dock.preparing)
                 }
                 if dock.preparing { ProgressView(dock.progress) }
-                LabeledContent("ETS2", value: installed ? "Installed" : "Install required")
-                Button(installed ? "Update ETS2" : "Install ETS2") { steam.install(TruckersMPTest.appID) }
-                    .disabled(!steam.signedIn || !dock.clientInstalled || dock.preparing ||
-                              steam.refreshing || steam.hasActiveDownload)
-                if let download = steam.downloads[TruckersMPTest.appID] {
-                    SteamDownloadStatus(download: download)
-                    if case .paused = download.state {
-                        Button("Resume ETS2 download") { steam.install(TruckersMPTest.appID) }
-                    }
-                    if case .failed = download.state {
-                        Button("Retry ETS2 download") { steam.install(TruckersMPTest.appID) }
-                    }
+                LabeledContent("ETS2", value: installed ? "Imported" : "Import required")
+                Button(installed ? "Replace ETS2 files" : "Import ETS2 folder") { showImport = true }
+                    .disabled(!dock.clientInstalled || dock.preparing || preparingPayload || importing)
+                if importing {
+                    ProgressView("Importing ETS2…", value: importProgress)
                 }
+            } footer: {
+                Text("Select Steam's steamapps folder containing ETS2 and appmanifest_227300.acf.")
             }
             Section {
                 Button(action: launch) {
@@ -126,15 +124,20 @@ struct TruckersMPTestView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!jitReady || !installed || !SteamSignIn.isSignedIn || !dock.clientInstalled ||
-                          preparingPayload || dock.preparing || steam.hasActiveDownload)
+                          preparingPayload || dock.preparing || importing)
             }
-            if let error = library.error ?? dock.error ?? steam.error {
+            if let error = importError ?? library.error ?? dock.error {
                 Section { Text(error).foregroundStyle(.red).textSelection(.enabled) }
             }
         }
         .sheet(isPresented: $showSignIn) { SteamSignInView() }
+        .fileImporter(isPresented: $showImport, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder): importETS2(folder)
+            case .failure(let error): importError = error.localizedDescription
+            }
+        }
         .task {
-            steam.start()
             dock.refresh()
             jitReady = jit_check_debugged()
         }
@@ -143,7 +146,22 @@ struct TruckersMPTestView: View {
             dock.refresh()
         }
         .onReceive(NotificationCenter.default.publisher(for: SteamSignIn.didChange)) { _ in dock.refresh() }
-        .onChange(of: steam.downloads) { _, _ in dock.refresh() }
+    }
+
+    private func importETS2(_ folder: URL) {
+        guard !importing, !preparingPayload else { return }
+        importing = true
+        importProgress = 0
+        importError = nil
+        library.error = nil
+        Task { @MainActor in
+            defer { importing = false; dock.refresh() }
+            do {
+                try await ETS2Import.shared.importFolder(folder, drive: MadeiraDock.drive) { fraction in
+                    Task { @MainActor in importProgress = fraction }
+                }
+            } catch { importError = error.localizedDescription }
+        }
     }
 }
 

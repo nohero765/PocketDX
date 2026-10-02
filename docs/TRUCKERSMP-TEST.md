@@ -1,7 +1,7 @@
 # ETS2 TruckersMP test build
 
 Target: iPhone 17 Pro Max, iOS 27.0.1. ETS2 only; ATS is excluded.
-The app provides Steam/JIT preparation, ETS2 installation and TruckersMP launch.
+The app provides Steam/JIT preparation, ETS2 folder import and TruckersMP launch.
 There is no telemetry, Discord integration or general game library UI.
 
 ## Launch path
@@ -36,8 +36,17 @@ and file SHA-256 values before bundling. Input files are not removed or rewritte
 The app installs a copy under its writable Wine prefix. A payload-manifest stamp
 avoids recopying assets on each launch. It does not download TruckersMP updates:
 this test build contains the supplied snapshot and may need a new IPA if
-TruckersMP changes the supported game or client version. Steam installs the
-user's owned Windows game separately. Required game redistributables use
+TruckersMP changes the supported game or client version. The user imports their
+own complete Windows ETS2 installation through Files; the app has no game
+download flow. Select the Steam `steamapps` folder containing
+`appmanifest_227300.acf` and `common/<installdir>`, or place that real install
+record inside the ETS2 folder before selecting it. The importer preserves its
+build and depot metadata, validates the 64-bit Windows executable and required
+archives, and publishes the install record only after a successful staged copy.
+Missing install metadata is rejected instead of generating a record that could
+cause Steam to download the game again. Steam still authenticates ownership;
+imported game/client version compatibility needs device testing.
+Required game redistributables use
 Madeira's existing Steam install-script path; Microsoft runtimes are not included
 in the repository's license and are not sourced from the user's other launchers.
 
@@ -50,7 +59,7 @@ successful build until the workflow completes; the clean-runner native build
 scripts still need live GitHub validation.
 
 Sideload with the required memory/JIT entitlements, enable debugger-backed JIT,
-sign in to Steam, prepare Steam, install ETS2, then select Launch TruckersMP.
+sign in to Steam, prepare Steam, import ETS2, then select Launch TruckersMP.
 Acceptance: TruckersMP login, server connection and actual driving with Metal HUD
 visible on the target phone. Log `[startup-dll] result=00000000 loaded=1` confirms
 DLL load only, not multiplayer success. Every launch failure must stay visible;

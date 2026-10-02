@@ -2921,12 +2921,13 @@ struct ContentView: View {
               wineserver_is_running() == 0, library.current == nil else { return }
         guard let game = MadeiraDock.games(drive: MadeiraDock.drive).first(where: {
             $0.id == TruckersMPTest.appID && $0.installed
-        }) else { library.error = "Install ETS2 through Steam first."; return }
+        }) else { library.error = "Import your Windows ETS2 files first."; return }
         preparingTruckersMP = true
         library.error = nil
         Task { @MainActor in
             defer { preparingTruckersMP = false }
             do {
+                try ETS2Import.validateGame(MadeiraDock.drive.appendingPathComponent(game.library + "/common/" + game.installDir))
                 try await TruckersMPPayload.shared.prepare(drive: MadeiraDock.drive)
                 TruckersMPTest.configure()
                 startDock(game, compactPool: false)

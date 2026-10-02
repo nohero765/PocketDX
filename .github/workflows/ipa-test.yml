@@ -44,6 +44,10 @@ jobs:
         run: |
           clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-startup.c -o TMP/startup-test
           TMP/startup-test
+      - name: Test ETS2 folder import
+        run: |
+          swiftc app/Madeira/SteamKeyValues.swift app/Madeira/ETS2Import.swift tests/ets2-import.swift -o TMP/import-test
+          TMP/import-test "$PWD/TMP"
       - name: Record native source pins
         id: pins
         shell: bash
