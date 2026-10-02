@@ -116,10 +116,11 @@ actor ETS2Import {
     }
 
     static func validateGame(_ folder: URL) throws {
-        for name in ["base.scs", "def.scs", "bin/win_x64/eurotrucks2.exe"] {
+        for name in ["base.scs", "def.scs", "bin/win_x64/eurotrucks2.exe",
+                     "bin/win_x64/fmod.dll", "bin/win_x64/fmodstudio.dll", "bin/win_x64/steam_api64.dll"] {
             let values = try? folder.appendingPathComponent(name).resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard values?.isRegularFile == true, values?.isSymbolicLink != true, (values?.fileSize ?? 0) > 0 else {
-                throw Failure("Select the complete Windows ETS2 folder containing base.scs, def.scs and bin/win_x64/eurotrucks2.exe.")
+                throw Failure("ETS2 is missing \(name). Import the complete Windows installation.")
             }
         }
         let file = try FileHandle(forReadingFrom: folder.appendingPathComponent("bin/win_x64/eurotrucks2.exe"))

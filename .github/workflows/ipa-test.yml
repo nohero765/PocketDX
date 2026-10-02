@@ -79,7 +79,7 @@ jobs:
             app/Madeira/arm64ec-windows/kernelbase.dll
             app/Madeira/arm64ec-windows/dockhost.exe
             app/Madeira/arm64ec-windows/dock-notices.txt
-      - name: Build native runtime
+      - name: Restore LLVM build cache
         # Keep LLVM independent of Wine/app fixes and preserve partial builds.
         # Bump llvm-v2 when changing the pinned LLVM configuration.
         # The native cache still supplies the final app archives on a hit.
