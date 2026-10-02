@@ -2929,7 +2929,8 @@ struct ContentView: View {
                 try ETS2Import.validateGame(MadeiraDock.drive.appendingPathComponent(game.library + "/common/" + game.installDir))
                 try await TruckersMPPayload.shared.prepare(drive: MadeiraDock.drive)
                 TruckersMPTest.configure()
-                startDock(game, compactPool: false)
+                // Keep the launch button locked while Steam closes its connection.
+                await prepareAndStartDock(game, compactPool: false)
             } catch {
                 TruckersMPTest.clear()
                 library.error = error.localizedDescription
@@ -2938,6 +2939,13 @@ struct ContentView: View {
     }
 
     private func startDock(_ game: DockGame, compactPool: Bool, profile: LibraryEntry? = nil) {
+        Task { @MainActor in
+            await prepareAndStartDock(game, compactPool: compactPool, profile: profile)
+        }
+    }
+
+    @MainActor
+    private func prepareAndStartDock(_ game: DockGame, compactPool: Bool, profile: LibraryEntry? = nil) async {
         let inLibrary = library.enabled
         guard jit_check_debugged() else {
             logStore.log("JIT not enabled. Press 'Enable JIT' first.", level: .error)
@@ -2971,68 +2979,66 @@ struct ContentView: View {
         // (library, playtime, downloads) logs off and its socket closes before the sign-in
         // is handed to Valve's client, and it stays off until the Dock session has ended
         // (SteamOwnedLibrary.prepareDock / dockEnded, SteamConnectionGate).
-        Task { @MainActor in
-            await SteamOwnedLibrary.shared.prepareDock()
-            do {
-                // The launch state may have changed while the connection closed.
-                guard jit_check_debugged(), wine_process_is_running() == 0, wineserver_is_running() == 0,
-                      !inLibrary || library.current == nil else {
-                    throw DockError.message("The launch state changed. Enable JIT and try again.")
-                }
-                guard let signIn = SteamSignIn.credentialsForDock() else {
-                    throw DockError.message("Sign in to Steam in Madeira before starting Dock.")
-                }
-                try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: game.id)
-            } catch { fail(error); return }
-            MadeiraDock.configure(game)
-            // The game's one-time installs (its Steam install script) run first, in the same
-            // session. No session runs yet, so the registry files can be read and written.
-            DockInstallers.prepare(game, drive: MadeiraDock.drive, prefix: MadeiraDock.prefix)
-            // Only a start that runs installers turns madsync off, for its own session
-            // (build/madsync/madsync.c reads MADEIRA_MADSYNC_SESSION once, when the server starts).
-            if DockInstallers.serverSync {
-                setenv("MADEIRA_MADSYNC_SESSION", "0", 1)
-                logStore.log("[dock-installers] this session runs one-time installs: madsync off for this session only (MADEIRA_MADSYNC_SESSION=0)")
-            } else {
-                unsetenv("MADEIRA_MADSYNC_SESSION")
+        await SteamOwnedLibrary.shared.prepareDock()
+        do {
+            // The launch state may have changed while the connection closed.
+            guard jit_check_debugged(), wine_process_is_running() == 0, wineserver_is_running() == 0,
+                  !inLibrary || library.current == nil else {
+                throw DockError.message("The launch state changed. Enable JIT and try again.")
             }
-            // A Dock session starts 64-bit (explorer, then the host), but the programs it starts
-            // later are often 32-bit: one-time installers and the 32-bit games Valve's client
-            // launches. win32u decides once, when the session's first program initialises it,
-            // whether the GDI handle table is a section that every 32-bit program can map inside
-            // its own guest window (wine dlls/win32u/gdiobj.c, gdi_shared_use_section). Left to
-            // that default, a Dock session's table is private host memory, and 32-bit gdi32
-            // truncates its address and faults on its first GDI handle. The regular launch path
-            // is unchanged; env.MADEIRA_GDI_SHARED_SECTION = 0 in madeira.cfg, exported after
-            // this, keeps the default for Dock sessions too.
-            setenv("MADEIRA_GDI_SHARED_SECTION", "1", 1)
-            var width = 1280, height = 720
-            if let txt = MadeiraConfig.get("desktop-size") {
-                let p = txt.lowercased().split(separator: "x").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
-                if p.count == 2, p[0] >= 640, p[1] >= 360, p[0] <= 3840, p[1] <= 2160 { width = p[0]; height = p[1] }
+            guard let signIn = SteamSignIn.credentialsForDock() else {
+                throw DockError.message("Sign in to Steam in Madeira before starting Dock.")
             }
-            // A Steam game's own Resolution (validated above) sizes its Dock desktop.
-            if let size = profile?.resolution.split(separator: "x").compactMap({ Int($0) }), size.count == 2 {
-                width = size[0]; height = size[1]
-            }
-            setenv("MADEIRA_EXE", "explorer.exe", 1)
-            setenv("MADEIRA_ARGS", MadeiraDock.launchArguments(width: width, height: height, installers: DockInstallers.script), 1)
-            setenv("MADEIRA_DESKTOP", "1", 1)
-            setenv("MADEIRA_SCREEN_W", String(width), 1)
-            setenv("MADEIRA_SCREEN_H", String(height), 1)
-            // The compositor and touch mapping read the published size
-            // (winios_screen_size), which a program's display-mode change moves;
-            // start this session from its own desktop size, not a previous one.
-            winios_display_mode_changed(Int32(width), Int32(height))
-            MadeiraDock.requestLaunch(compactPool: compactPool)
-            logStore.log("[madeira-dock] starting the host for app \(game.id); Valve's client authenticates and authorizes the launch")
-            MadeiraDockModel.shared.watchReport()
-            if inLibrary {
-                if let profile { library.begin(profile, dock: game) }
-                else { library.begin(.dockSession(title: game.name, width: width, height: height), remember: false, dock: game) }
-            }
-            runWineFullSequence(profile: profile)
+            try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: game.id)
+        } catch { fail(error); return }
+        MadeiraDock.configure(game)
+        // The game's one-time installs (its Steam install script) run first, in the same
+        // session. No session runs yet, so the registry files can be read and written.
+        DockInstallers.prepare(game, drive: MadeiraDock.drive, prefix: MadeiraDock.prefix)
+        // Only a start that runs installers turns madsync off, for its own session
+        // (build/madsync/madsync.c reads MADEIRA_MADSYNC_SESSION once, when the server starts).
+        if DockInstallers.serverSync {
+            setenv("MADEIRA_MADSYNC_SESSION", "0", 1)
+            logStore.log("[dock-installers] this session runs one-time installs: madsync off for this session only (MADEIRA_MADSYNC_SESSION=0)")
+        } else {
+            unsetenv("MADEIRA_MADSYNC_SESSION")
         }
+        // A Dock session starts 64-bit (explorer, then the host), but the programs it starts
+        // later are often 32-bit: one-time installers and the 32-bit games Valve's client
+        // launches. win32u decides once, when the session's first program initialises it,
+        // whether the GDI handle table is a section that every 32-bit program can map inside
+        // its own guest window (wine dlls/win32u/gdiobj.c, gdi_shared_use_section). Left to
+        // that default, a Dock session's table is private host memory, and 32-bit gdi32
+        // truncates its address and faults on its first GDI handle. The regular launch path
+        // is unchanged; env.MADEIRA_GDI_SHARED_SECTION = 0 in madeira.cfg, exported after
+        // this, keeps the default for Dock sessions too.
+        setenv("MADEIRA_GDI_SHARED_SECTION", "1", 1)
+        var width = 1280, height = 720
+        if let txt = MadeiraConfig.get("desktop-size") {
+            let p = txt.lowercased().split(separator: "x").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            if p.count == 2, p[0] >= 640, p[1] >= 360, p[0] <= 3840, p[1] <= 2160 { width = p[0]; height = p[1] }
+        }
+        // A Steam game's own Resolution (validated above) sizes its Dock desktop.
+        if let size = profile?.resolution.split(separator: "x").compactMap({ Int($0) }), size.count == 2 {
+            width = size[0]; height = size[1]
+        }
+        setenv("MADEIRA_EXE", "explorer.exe", 1)
+        setenv("MADEIRA_ARGS", MadeiraDock.launchArguments(width: width, height: height, installers: DockInstallers.script), 1)
+        setenv("MADEIRA_DESKTOP", "1", 1)
+        setenv("MADEIRA_SCREEN_W", String(width), 1)
+        setenv("MADEIRA_SCREEN_H", String(height), 1)
+        // The compositor and touch mapping read the published size
+        // (winios_screen_size), which a program's display-mode change moves;
+        // start this session from its own desktop size, not a previous one.
+        winios_display_mode_changed(Int32(width), Int32(height))
+        MadeiraDock.requestLaunch(compactPool: compactPool)
+        logStore.log("[madeira-dock] starting the host for app \(game.id); Valve's client authenticates and authorizes the launch")
+        MadeiraDockModel.shared.watchReport()
+        if inLibrary {
+            if let profile { library.begin(profile, dock: game) }
+            else { library.begin(.dockSession(title: game.name, width: width, height: height), remember: false, dock: game) }
+        }
+        runWineFullSequence(profile: profile)
     }
 
     /// ml589: locate an installed Steam inside the prefix and (re)generate

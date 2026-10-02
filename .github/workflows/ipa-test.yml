@@ -51,6 +51,8 @@ jobs:
           TMP/args-test
           clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-env.c -o TMP/env-test
           TMP/env-test
+      - name: Test native FEX diagnostics
+        run: python3 tests/fex-native-diagnostics.py "$PWD/TMP"
       - name: Test ETS2 folder import
         run: |
           swiftc app/Madeira/SteamKeyValues.swift app/Madeira/ETS2Import.swift tests/ets2-import.swift -o TMP/import-test
