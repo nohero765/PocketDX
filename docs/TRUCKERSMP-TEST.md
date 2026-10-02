@@ -65,6 +65,12 @@ Debug matches upstream's documented working app configuration. It is not a
 successful build until the workflow completes; the clean-runner native build
 scripts still need live GitHub validation.
 
+The LLVM bootstrap applies upstream Madeira's documented iOS linker adjustment
+and builds only DXMT's required static archives. Its cache restores the prior
+partial LLVM build across this configuration change, so compiled objects can
+be reused without rebuilding the unused command-line tools. DXMT's three
+embedded AIR shader headers are generated before the converter is compiled.
+
 Sideload with the required memory/JIT entitlements, enable debugger-backed JIT,
 sign in to Steam, prepare Steam, import ETS2, then select Launch TruckersMP.
 Acceptance: TruckersMP login, server connection and actual driving with Metal HUD

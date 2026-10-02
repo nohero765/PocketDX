@@ -30,6 +30,18 @@ if [ ! -d toolchains/llvm-project/llvm ]; then
     tar -xzf "$T/llvm.tar.gz" -C toolchains/llvm-project --strip-components=1
     rm "$T/llvm.tar.gz"
 fi
+python3 build/truckersmp/patch-llvm.py
+# DXMT's bitwriter/passes closure (dxmt/src/airconv/meson.build).
+# Build archives explicitly: LLVM's default target also brings in binaries.
+LLVM_LIBRARIES=(
+    LLVMPasses LLVMTarget LLVMObjCARCOpts LLVMCoroutines LLVMipo
+    LLVMInstrumentation LLVMVectorize LLVMLinker LLVMIRReader LLVMAsmParser
+    LLVMFrontendOpenMP LLVMScalarOpts LLVMInstCombine LLVMAggressiveInstCombine
+    LLVMTransformUtils LLVMBitWriter LLVMAnalysis LLVMProfileData LLVMSymbolize
+    LLVMDebugInfoPDB LLVMDebugInfoMSF LLVMDebugInfoDWARF LLVMObject LLVMTextAPI
+    LLVMMCParser LLVMMC LLVMDebugInfoCodeView LLVMBitReader LLVMCore LLVMRemarks
+    LLVMBitstreamReader LLVMBinaryFormat LLVMSupport LLVMDemangle
+)
 if [ ! -x toolchains/llvm-host-build/bin/llvm-tblgen ]; then
     cmake -S toolchains/llvm-project/llvm -B toolchains/llvm-host-build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD= -DLLVM_ENABLE_PROJECTS= \
@@ -42,10 +54,19 @@ cmake -S toolchains/llvm-project/llvm -B toolchains/llvm-ios-build -G Ninja \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_HOST_TRIPLE=arm64-apple-ios17.0 -DLLVM_DEFAULT_TARGET_TRIPLE=arm64-apple-ios17.0 \
     -DLLVM_TARGET_ARCH=host -DLLVM_TARGETS_TO_BUILD= -DLLVM_ENABLE_PROJECTS= \
-    -DLLVM_BUILD_TOOLS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
+    -DLLVM_INCLUDE_TOOLS=OFF -DLLVM_BUILD_TOOLS=OFF \
+    -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_UTILS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
     -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF \
+    -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_LIBEDIT=OFF \
     -DLLVM_TABLEGEN="$R/toolchains/llvm-host-build/bin/llvm-tblgen"
-cmake --build toolchains/llvm-ios-build --parallel "$JOBS"
+cmake --build toolchains/llvm-ios-build --target "${LLVM_LIBRARIES[@]}" --parallel "$JOBS"
+archives=()
+for library in "${LLVM_LIBRARIES[@]}"; do
+    archive="toolchains/llvm-ios-build/lib/lib${library}.a"
+    [ -s "$archive" ] || { echo "Missing required LLVM archive: $archive"; exit 1; }
+    archives+=("$archive")
+done
 
 bash build/gnutls-ios/build.sh
 bash build/ffmpeg/build.sh
@@ -76,7 +97,6 @@ bash build/wineserver/build.sh
 bash build/ntdll-unix/build.sh
 bash build/win32u-unix/build.sh
 bash build/dxmt-ios/build.sh
-archives=(toolchains/llvm-ios-build/lib/*.a)
 xcrun libtool -static -o app/Madeira/libdxmt_combined.a build/dxmt-ios/libdxmt_unix.a "${archives[@]}"
 LLVM_MINGW="$TC/bin" bash build/madeira-dock/build.sh --check
 mkdir -p app/Madeira/x86_64-vcruntime
