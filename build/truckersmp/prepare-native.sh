@@ -66,6 +66,7 @@ make -C wine/build-macos -j "$JOBS" tools/winebuild/winebuild tools/widl/widl
 make -C wine/build-macos -j "$JOBS" include/all
 bash build/wine-pe/build-ntdll.sh
 make -C wine/build-arm64ec -j "$JOBS" dlls/kernelbase/arm64ec-windows/kernelbase.dll
+make -C wine/build-arm64ec -j "$JOBS" include/all
 "$TC/bin/arm64ec-w64-mingw32-strip" wine/build-arm64ec/dlls/kernelbase/arm64ec-windows/kernelbase.dll
 cp wine/build-arm64ec/dlls/kernelbase/arm64ec-windows/kernelbase.dll app/Madeira/arm64ec-windows/
 

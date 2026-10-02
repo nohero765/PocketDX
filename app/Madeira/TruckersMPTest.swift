@@ -173,8 +173,12 @@ struct TruckersMPTestHUD: View {
         VStack {
             HStack {
                 Button("Keyboard", systemImage: "keyboard") { MetalBackedView.toggleKeyboard() }
+                    .frame(width: 44, height: 44)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { library.performanceRect = $0 }
                 Spacer()
                 Button("Close", systemImage: "xmark") { library.requestQuit() }
+                    .frame(width: 44, height: 44)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { library.menuButtonRect = $0 }
             }
             .labelStyle(.iconOnly).buttonStyle(.bordered).padding()
             if library.launching {
@@ -183,5 +187,6 @@ struct TruckersMPTestHUD: View {
             }
             Spacer()
         }
+        .onDisappear { library.menuButtonRect = .zero; library.performanceRect = .zero }
     }
 }

@@ -1235,7 +1235,7 @@ struct ContentView: View {
             // under the title, the buttons and the search field behind a
             // progressive blur (as in the App Store), with no hard edge.
             .toolbarBackground(library.enabled && !Self.systemScrollEdge ? .visible : .automatic, for: .navigationBar)
-            .navigationBarHidden(library.enabled ? library.current != nil : vSizeClass == .compact)
+            .toolbarVisibility((library.enabled ? library.current != nil : vSizeClass == .compact) ? .hidden : .visible, for: .navigationBar)
             // A second session cannot start in this process; offer to close Madeira.
             .alert("Restart Madeira", isPresented: Binding(get: { library.restartNotice != nil },
                                                             set: { if !$0 { library.restartNotice = nil } })) {
@@ -1255,7 +1255,6 @@ struct ContentView: View {
                 logEntitlementStatus()
                 logStore.log("[build] \(BuildStamp.text)")
                 FrontendChoice.logStartup()
-                DeviceLoadDiagnostics.start()
                 // Madeira Dock: an unconsumed sign-in transfer from an earlier run goes.
                 if wine_process_is_running() == 0 { MadeiraDock.cleanup() }
             }
@@ -3525,8 +3524,7 @@ final class ControlsWindow: UIWindow {
         // button, its performance overlay and the touch controls do.
         let library = LibraryModel.shared
         if library.current != nil {
-            if library.menu || library.launching || library.menuButtonRect.contains(point) ||
-                (library.performance && library.performanceRect.contains(point)) {
+            if library.launching || library.menuButtonRect.contains(point) || library.performanceRect.contains(point) {
                 return super.hitTest(point, with: event)
             }
             guard m.hitsInteractive(point, in: bounds, topBar: false) else { return nil }
@@ -3586,11 +3584,12 @@ struct TouchControlsOverlay: View {
                     if (m.visible || m.editing) && !library.blocksGameplayTouch {
                         controls(geo.size, session: session)
                     }
-                    if session && !m.editing { TruckersMPTestHUD() } else { topBar }
+                    if !session || m.editing { topBar }
                     if m.editing, let i = m.index(of: m.selected) {
                         MappingPanel(control: m.controls[i], screen: geo.size)
                     }
                 }
+                if session && !m.editing { TruckersMPTestHUD() }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
             .contentShape(Rectangle())
