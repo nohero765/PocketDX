@@ -168,6 +168,7 @@ struct TruckersMPTestView: View {
 struct TruckersMPTestHUD: View {
     @ObservedObject private var library = LibraryModel.shared
     @ObservedObject private var dock = MadeiraDockModel.shared
+    @ObservedObject private var dockStart = DockStartScreen.shared
 
     var body: some View {
         VStack {
@@ -181,7 +182,10 @@ struct TruckersMPTestHUD: View {
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { library.menuButtonRect = $0 }
             }
             .labelStyle(.iconOnly).buttonStyle(.bordered).padding()
-            if library.launching {
+            if let failure = dockStart.failure {
+                Text(failure).foregroundStyle(.red).textSelection(.enabled)
+                    .padding().background(.regularMaterial, in: .rect(cornerRadius: 12))
+            } else if library.launching {
                 ProgressView(dock.status ?? "Starting TruckersMP…")
                     .padding().background(.regularMaterial, in: .rect(cornerRadius: 12))
             }
