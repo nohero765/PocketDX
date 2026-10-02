@@ -80,8 +80,32 @@ jobs:
             app/Madeira/arm64ec-windows/dockhost.exe
             app/Madeira/arm64ec-windows/dock-notices.txt
       - name: Build native runtime
+        # Keep LLVM independent of Wine/app fixes and preserve partial builds.
+        # Bump llvm-v2 when changing the pinned LLVM configuration.
+        # The native cache still supplies the final app archives on a hit.
+        if: steps.native.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        id: llvm
+        with:
+          key: llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.version }}-8dfdcc7b7
+          path: |
+            toolchains/llvm-project
+            toolchains/llvm-host-build
+            toolchains/llvm-ios-build
+            toolchains/llvm-mingw-20260421-ucrt-macos-universal
+      - name: Compile native runtime
         if: steps.native.outputs.cache-hit != 'true'
         run: bash build/truckersmp/prepare-native.sh 2>&1 | tee TMP/native-build.log
+      - name: Save LLVM progress
+        if: always() && steps.llvm.outcome == 'success' && steps.llvm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+          path: |
+            toolchains/llvm-project
+            toolchains/llvm-host-build
+            toolchains/llvm-ios-build
+            toolchains/llvm-mingw-20260421-ucrt-macos-universal
       - name: Save native runtime
         if: steps.native.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4

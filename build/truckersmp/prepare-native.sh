@@ -38,6 +38,7 @@ if [ ! -x toolchains/llvm-host-build/bin/llvm-tblgen ]; then
 fi
 cmake -S toolchains/llvm-project/llvm -B toolchains/llvm-ios-build -G Ninja \
     -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT="$SDK" \
+    -DCMAKE_MACOSX_BUNDLE=OFF \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_HOST_TRIPLE=arm64-apple-ios17.0 -DLLVM_DEFAULT_TARGET_TRIPLE=arm64-apple-ios17.0 \
     -DLLVM_TARGET_ARCH=host -DLLVM_TARGETS_TO_BUILD= -DLLVM_ENABLE_PROJECTS= \
