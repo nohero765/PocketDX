@@ -54,6 +54,12 @@ jobs:
             -Ibuild -Iresearch -Idxmt/include -Idxmt/libs \
             -Idxmt/src/winemetal -Idxmt/src/airconv \
             dxmt/src/winemetal/unix/winemetal_unix.c
+      - name: Check AIR shaders against Metal compiler
+        run: |
+          for shader in air_msad air_samplepos air_tessellation; do
+            xcrun --sdk macosx metal -c "dxmt/src/airconv/shaders/$shader.metal" \
+              -std=metal3.1 --target=air64-apple-macos14.0 -o "TMP/$shader.air"
+          done
       - name: Test startup hook
         run: |
           clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-startup.c -o TMP/startup-test

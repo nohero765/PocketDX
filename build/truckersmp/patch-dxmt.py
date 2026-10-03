@@ -20,4 +20,14 @@ for filename, old_path, new_path, dependency in patches:
         source.write_text(text.replace(old, new, 1))
     elif text.count(new) != 1 or old in text:
         raise SystemExit(f'Unexpected include in {filename}: inspect the pinned source before building')
-print('DXMT parent header includes ready')
+# Xcode 27 changed the compiler-private builtin's signature. The public
+# overload infers threadgroup scope from the pointer and keeps relaxed ordering.
+shader = root / 'dxmt/src/airconv/shaders/air_tessellation.metal'
+old = 'return __metal_atomic_fetch_add_explicit(out_count, 1, int(memory_order_relaxed), __METAL_MEMORY_SCOPE_THREADGROUP__);'
+new = 'return atomic_fetch_add_explicit(reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_order_relaxed);'
+text = shader.read_text()
+if text.count(old) == 1 and new not in text:
+    shader.write_text(text.replace(old, new, 1))
+elif text.count(new) != 1 or old in text:
+    raise SystemExit('Unexpected tessellation atomic call; inspect the pinned shader before building')
+print('DXMT parent headers and public Metal atomic ready')
