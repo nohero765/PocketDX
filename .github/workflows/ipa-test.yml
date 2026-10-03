@@ -44,6 +44,15 @@ jobs:
           if ! xcrun -sdk macosx metal --version; then xcodebuild -downloadComponent MetalToolchain; fi
       - name: Install build tools
         run: brew install cmake ninja meson bison flex pkg-config ccache llvm
+      - name: Check winemetal against iPhone SDK
+        run: |
+          python3 build/truckersmp/patch-dxmt.py
+          xcrun --sdk iphoneos clang -fsyntax-only -x objective-c -fblocks \
+            -arch arm64 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            -miphoneos-version-min=18.0 \
+            -Ibuild -Iresearch -Idxmt/include -Idxmt/libs \
+            -Idxmt/src/winemetal -Idxmt/src/airconv \
+            dxmt/src/winemetal/unix/winemetal_unix.c
       - name: Test startup hook
         run: |
           clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-startup.c -o TMP/startup-test
