@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 360
     defaults:
       run:
@@ -34,13 +34,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p TMP
-          selected="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)"
-          if [ -n "$selected" ]; then sudo xcode-select -s "$selected/Contents/Developer"; fi
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcode_version="$(xcodebuild -version)"
           printf '%s\n' "$xcode_version"
           echo "version=$(printf '%s\n' "$xcode_version" | tr '\n' '-' | tr ' ' '_')" >> "$GITHUB_OUTPUT"
           major="$(printf '%s\n' "$xcode_version" | awk '/^Xcode / {split($2, parts, "."); print parts[1]}')"
-          [ "$major" -ge 26 ] || { echo 'Xcode 26 or newer is required'; exit 1; }
+          [ "$major" -ge 27 ] || { echo 'Xcode 27 or newer is required'; exit 1; }
+          ios_sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          [ "${ios_sdk%%.*}" -ge 27 ] || { echo "iOS 27 SDK required; found $ios_sdk"; exit 1; }
           if ! xcrun -sdk macosx metal --version; then xcodebuild -downloadComponent MetalToolchain; fi
       - name: Install build tools
         run: brew install cmake ninja meson bison flex pkg-config ccache llvm
