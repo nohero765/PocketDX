@@ -139,10 +139,10 @@ struct TruckersMPTestView: View {
         }
         .task {
             dock.refresh()
-            jitReady = jit_check_debugged()
+            jitReady = StikJITHelper.ready
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            jitReady = jit_check_debugged()
+            jitReady = StikJITHelper.ready
             dock.refresh()
         }
         .onReceive(NotificationCenter.default.publisher(for: SteamSignIn.didChange)) { _ in dock.refresh() }

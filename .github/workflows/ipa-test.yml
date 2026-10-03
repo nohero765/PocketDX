@@ -51,6 +51,8 @@ jobs:
           TMP/args-test
           clang -std=c11 -Wall -Wextra -Werror tests/truckersmp-env.c -o TMP/env-test
           TMP/env-test
+      - name: Check Wine diagnostics against iPhone SDK
+        run: python3 tests/wine-process-diagnostics.py "$PWD/TMP" iphoneos
       - name: Test native FEX diagnostics
         run: python3 tests/fex-native-diagnostics.py "$PWD/TMP"
       - name: Test ETS2 folder import

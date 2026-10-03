@@ -163,7 +163,7 @@ else
     FAILED_FILES="$FAILED_FILES wg_parser_apple_ios"
 fi
 
-for src in $WINE_SRC/dlls/ntdll/unix/*.c; do
+for src in "$WINE_SRC"/dlls/ntdll/unix/*.c; do
     name=$(basename "$src" .c)
 
     # Use patched versions for specific files
@@ -202,6 +202,10 @@ echo ""
 echo "Results: $SUCCEEDED succeeded, $FAILED failed"
 if [ -n "$FAILED_FILES" ]; then
     echo "Failed:$FAILED_FILES"
+    for name in $FAILED_FILES; do
+        cat "$OBJ_DIR/$name.err" >&2
+    done
+    exit 1
 fi
 
 echo ""
