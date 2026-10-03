@@ -36,9 +36,10 @@ jobs:
           mkdir -p TMP
           selected="$(find /Applications -maxdepth 1 -name 'Xcode_26*.app' | sort -V | tail -1)"
           if [ -n "$selected" ]; then sudo xcode-select -s "$selected/Contents/Developer"; fi
-          xcodebuild -version
-          echo "version=$(xcodebuild -version | tr '\n' '-' | tr ' ' '_')" >> "$GITHUB_OUTPUT"
-          major="$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)"
+          xcode_version="$(xcodebuild -version)"
+          printf '%s\n' "$xcode_version"
+          echo "version=$(printf '%s\n' "$xcode_version" | tr '\n' '-' | tr ' ' '_')" >> "$GITHUB_OUTPUT"
+          major="$(printf '%s\n' "$xcode_version" | awk '/^Xcode / {split($2, parts, "."); print parts[1]}')"
           [ "$major" -ge 26 ] || { echo 'Xcode 26 or newer is required'; exit 1; }
           if ! xcrun -sdk macosx metal --version; then xcodebuild -downloadComponent MetalToolchain; fi
       - name: Install build tools
